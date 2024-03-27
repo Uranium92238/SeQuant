@@ -604,6 +604,10 @@ endif ()
 
 add_subdirectory(doc)
 
+####### External interface ########
+
+add_subdirectory(external-interface)
+
 
 ##########################
 # export SeQuant
