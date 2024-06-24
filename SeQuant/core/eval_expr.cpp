@@ -351,6 +351,11 @@ ExprPtr make_prod(EvalExpr const& left, EvalExpr const& right) noexcept {
   auto const& t2 = right.as_tensor();
 
   auto [bra, ket, auxiliary] = get_uncontracted_indices(t1, t2);
+
+  std::sort(bra.begin(), bra.end());
+  std::sort(ket.begin(), ket.end());
+  std::sort(auxiliary.begin(), auxiliary.end());
+
   if (bra.empty() && ket.empty() && auxiliary.empty()) {
     // dot product
     return ex<Variable>(var_label);
