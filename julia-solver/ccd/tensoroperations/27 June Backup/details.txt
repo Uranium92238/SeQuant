@@ -1,0 +1,1 @@
+In this version we used a highly inefficient way to computing the dot product of tensors. We did to ensure concurrence of results and intermediates with Molpro. Now that DIIS is working and we have seen the convergence behaviour does not change regardless of which Dot we use, we will use the optimized dot function from the Julia library.

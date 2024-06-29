@@ -1,0 +1,44 @@
+[quote="mtfishman, post:2, topic:1814"]
+could just be written with broadcasting as `T2 .= T2 .- Scaled_R2`. By design of the ITensor type, writing for-loops over the elements of an ITensor is slower than the equivalent for-loop over Julia arrays so it is best to avoid that and use operations like broadcasting when possible.
+[/quote]
+
+Apologies for the extremely late reply. As you rightly pointed out, the second loop could be substituted with a broadcasting statement, whereas the first one cannot be (simply at least). I tried replacing the second loop by the above to give the resulting code
+
+```
+function update_T2(T2::ITensor,R2::ITensor,Scaled_R2::ITensor)
+    fvv = ITensor(deserialize("fvv.jlbin"),a_1,a_2)
+    foo = ITensor(deserialize("foo.jlbin"),i_1,i_2)
+    nv = deserialize("nv.jlbin")::Int64
+    nocc = deserialize("nocc.jlbin")::Int64
+    shiftp = 0.20
+    for a in 1:nv, b in 1:nv, i in 1:nocc, j in 1:nocc
+        Scaled_R2[a,b,i,j] = R2[a,b,i,j]/(fvv[a,a] + fvv[b,b]-foo[i,i] - foo[j,j]+shiftp)
+    end
+    # for a in 1:nv, b in 1:nv, i in 1:nocc, j in 1:nocc
+    #     T2[a,b,i,j] = T2[a,b,i,j] - Scaled_R2[a,b,i,j]
+    # end
+    T2 .= T2 .- Scaled_R2
+    return T2
+end
+```
+Somehow, now it seems to produce the correct result !? You mentioned something about checking if the indices are lined up correctly, I am not sure if I understand what you meant by that. Also, let me know which more parts of the code might be necessary as you mentioned that it is difficult to debug the code with such a small snippet. 
+
+For some extra context, I can tell you that the binaries `fvv.jlbin` and are all stored in form of `Array{Float64,4}` and are being read and converted to `ITensor` . Below is the part of the code that initializes the ITensors `T2` `R2` and `Scaled_R2` 
+
+```
+using ITensors
+include("ccd-helper.jl")
+nv,no = 2,4
+a_1 = Index(nv,"a_1");
+a_2 = Index(nv,"a_2");
+i_1 = Index(no,"i_1");
+i_2 = Index(no,"i_2");
+iT2 = ITensor(initialize_t2_only(),a_1,a_2,i_1,i_2);
+iR2u = ITensor(zeros(2,2,4,4),a_1,a_2,i_1,i_2);
+Scaled_iR2 = ITensor(zeros(2,2,4,4),a_1,a_2,i_1,i_2);
+iR2 = calcresnew(iT2);
+iT2 = update_T2(iT2,iR2,Scaled_iR2);
+@show iR2
+@show iT2
+```
+Where `calcresnew(iT2)` unfortunately is quite elaborate but has been verified to produce the correct result. I will provide the function if necessary.
