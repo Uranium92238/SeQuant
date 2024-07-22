@@ -6,15 +6,15 @@ include("ccd-helper.jl")
 function ccd_by_hand(maxitr)
     initialize_cc_variables()
     nv::Int64 = deserialize("nv.jlbin")
-    nocc::Int64 = deserialize("nocc.jlbin")
+    no::Int64 = deserialize("no.jlbin")
     erhf::Float64 = deserialize("erhf.jlbin")
-    R2u,R2 = zeros(Float64,nv,nv,nocc,nocc),zeros(Float64,nv,nv,nocc,nocc)
+    R2u,R2 = zeros(Float64,nv,nv,no,no),zeros(Float64,nv,nv,no,no)
     R_iter = zeros(Float64,size(R2)) 
     Scaled_R2 = zeros(Float64,size(R2))
     T2_old = initialize_t2_only();
     normtol=1.0e-8
-    # display(T2_old) # Using MP2 amplitudes
-    e_new = calculate_ECCD(T2_old)
+    serialize("T2_vvoo.jlbin",T2_old)
+    e_new = calculate_ECCD()
     e_old = copy(0.0)
     earr = []
     etol = 1.0e-10

@@ -116,6 +116,27 @@ class JuliaITensorGen : public JuliaTensorOperationsGen<Context> {
 
   void compute(const Expr &expression, const Tensor &result,
                const Context &ctx) override {
+    if (expression.is<Sum>()) {
+      for (const ExprPtr &current : expression.as<Sum>().summands()) {
+        compute(*current, result, ctx);
+      }
+
+      return;
+    }
+expression.visit(
+    [this, &result, &ctx](const ExprPtr &leaf) {
+        if (leaf.is<Tensor>()) {
+            Tensor lhs = result;
+            Tensor rhs = leaf.as<Tensor>();
+            std::string lhs_indices = this->get_indices_string(lhs, ctx);
+            std::string rhs_indices = this->get_indices_string(rhs, ctx);
+            //Tensor = replaceinds(Tensor, inds(Tensor) => (a_1,a_2,i_1,i_2))
+            // this->m_generated += "    #lhs tensor = " + this->represent(lhs, ctx) + " rhs tensor = " + this->represent(rhs, ctx) + "\n";
+            // this->m_generated += "    #lhs indices = " + lhs_indices + " rhs indices = " + rhs_indices + "\n";
+            this->m_generated += this->represent(rhs, ctx) + " = replaceinds(" + this->represent(rhs, ctx) + ", inds(" + this->represent(rhs, ctx) + ") => (" + rhs_indices + "))\n";
+        }
+    },
+    true); // The second argument 'true' indicates that only leaf nodes should be visited.
     this->m_generated += JuliaITensorGen<Context>::represent(result, ctx) +
                          " += " + Base::to_julia_expr(expression, ctx) + "\n";
   }

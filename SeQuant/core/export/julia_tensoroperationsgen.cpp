@@ -28,7 +28,7 @@ std::string JuliaTensorOperationsGenContext::get_dim(
   if (it != m_index_dims.end()) {
     return it->second;
   } else {
-    return "dim_" + get_tag(indexspace);
+    return "n" + get_tag(indexspace);
   }
 }
 

@@ -76,19 +76,19 @@ function main(pathtofcidump)
             h[J,I] = h[I,J]
         end
     end
-    nocc = round(Int,nelec/2)
-    nv = norb - nocc
+    no = round(Int,nelec/2)
+    nv = norb - no
     h = convert(Array{Float64}, h)
     g = convert(Array{Float64}, g)
-    K = zeros(nv,nv,nocc,nocc)
-    for a in 1:nv, b in 1:nv, i in 1:nocc, j in 1:nocc
-        K[a,b,i,j] = g[nocc+a,i,nocc+b,j]
+    K = zeros(nv,nv,no,no)
+    for a in 1:nv, b in 1:nv, i in 1:no, j in 1:no
+        K[a,b,i,j] = g[no+a,i,no+b,j]
     end
     H1 = 0.0;
     H2 = 0.0;
-    for i in 1:nocc
+    for i in 1:no
         H1 = H1+  h[i,i]
-        for j in 1:nocc
+        for j in 1:no
             H2 = H2 +  2 * g[i,i,j,j] - g[i,j,i,j]
         end
     end
@@ -96,7 +96,7 @@ function main(pathtofcidump)
     f = zeros(size(h)) # fock matrix Initialization
     for p in 1:norb , q in 1:norb
         s_pq=0
-        for i in 1:nocc
+        for i in 1:no
             s_pq += 2*g[p,q,i,i]-g[p,i,i,q]
         end
         f[p,q] = h[p,q] + s_pq
@@ -106,7 +106,7 @@ function main(pathtofcidump)
     serialize("hnuc.jlbin", hnuc)
     serialize("norbs.jlbin", norb)
     serialize("nelec.jlbin", nelec)
-    serialize("nocc.jlbin", nocc)
+    serialize("no.jlbin", no)
     serialize("nv.jlbin", nv)
     serialize("K.jlbin", K)
     serialize("erhf.jlbin", erhf)
@@ -115,13 +115,13 @@ end
 
 function initialize_t2_only()
     nv = deserialize("nv.jlbin")
-    nocc = deserialize("nocc.jlbin")
+    no = deserialize("no.jlbin")
 ################## Amplitude Initialization ######################################
     K = deserialize("K.jlbin")
     f = deserialize("f.jlbin")
     T2::Array{Float64,4} = - K 
-    for a in 1:nv, b in 1:nv, i in 1:nocc, j in 1:nocc
-        T2[a,b,i,j] = T2[a,b,i,j]/(f[nocc+a,nocc+a] + f[nocc+b,nocc+b] - f[i,i] - f[j,j])
+    for a in 1:nv, b in 1:nv, i in 1:no, j in 1:no
+        T2[a,b,i,j] = T2[a,b,i,j]/(f[no+a,no+a] + f[no+b,no+b] - f[i,i] - f[j,j])
         # if abs(T2[a,b,i,j]) < 10e-8
         #     T2[a,b,i,j] = 0.0
         # end
@@ -135,32 +135,32 @@ function initialize_cc_variables()
     K = deserialize("K.jlbin")
     f = deserialize("f.jlbin")
     g = deserialize("g.jlbin")
-    nocc = deserialize("nocc.jlbin")
+    no = deserialize("no.jlbin")
     nv = deserialize("nv.jlbin")
-    g_vvoo = zeros(nv,nv,nocc,nocc)
-    g_voov = zeros(nv,nocc,nocc,nv)
-    g_vovo = zeros(nv,nocc,nv,nocc)
-    g_oovv = zeros(nocc,nocc,nv,nv)
-    g_oooo = zeros(nocc,nocc,nocc,nocc)
+    g_vvoo = zeros(nv,nv,no,no)
+    g_voov = zeros(nv,no,no,nv)
+    g_vovo = zeros(nv,no,nv,no)
+    g_oovv = zeros(no,no,nv,nv)
+    g_oooo = zeros(no,no,no,no)
     g_vvvv = zeros(nv,nv,nv,nv)
     f_vv = zeros(nv,nv)
-    f_oo = zeros(nocc,nocc)
+    f_oo = zeros(no,no)
     for a in 1:nv, b in 1:nv
-        f_vv[a,b] = f[nocc+a,nocc+b]
+        f_vv[a,b] = f[no+a,no+b]
         
-        for i in 1:nocc, j in 1:nocc
-            g_vvoo[a,b,i,j] = g[nocc+a,i,nocc+b,j]
-            g_voov[a,i,j,b] = g[nocc+a,j,i,nocc+b]
-            g_vovo[a,i,b,j] = g[nocc+a,nocc+b,i,j]
-            g_oovv[i,j,a,b] = g[i,nocc+a,j,nocc+b]
+        for i in 1:no, j in 1:no
+            g_vvoo[a,b,i,j] = g[no+a,i,no+b,j]
+            g_voov[a,i,j,b] = g[no+a,j,i,no+b]
+            g_vovo[a,i,b,j] = g[no+a,no+b,i,j]
+            g_oovv[i,j,a,b] = g[i,no+a,j,no+b]
             f_oo[i,j] = f[i,j]
         end
     end
-    for i in 1:nocc, j in 1:nocc, k in 1:nocc, l in 1:nocc
+    for i in 1:no, j in 1:no, k in 1:no, l in 1:no
         g_oooo[i,j,k,l] = g[i,k,j,l]
     end
     for a in 1:nv, b in 1:nv, c in 1:nv, d in 1:nv
-        g_vvvv[a,b,c,d] = g[nocc+a,nocc+c,nocc+b,nocc+d]
+        g_vvvv[a,b,c,d] = g[no+a,no+c,no+b,no+d]
     end
     serialize("g_vvoo.jlbin", g_vvoo)
     serialize("g_voov.jlbin", g_voov)
@@ -192,9 +192,9 @@ function calculate_residual_memeff_gc(T2)
     g_vvoo,g_voov,g_vovo,g_oovv,g_oooo,g_vvvv = deserialize("g_vvoo.jlbin"),deserialize("g_voov.jlbin"),deserialize("g_vovo.jlbin"),deserialize("g_oovv.jlbin"),deserialize("g_oooo.jlbin"),deserialize("g_vvvv.jlbin")
     f_vv , f_oo = deserialize("f_vv.jlbin"),deserialize("f_oo.jlbin")
     nv = deserialize("nv.jlbin")
-    nocc = deserialize("nocc.jlbin")
-    R2u = zeros(Float64,nv,nv,nocc,nocc)
-    R2 = zeros(Float64,nv,nv,nocc,nocc)
+    no = deserialize("no.jlbin")
+    R2u = zeros(Float64,nv,nv,no,no)
+    R2 = zeros(Float64,nv,nv,no,no)
     @tensor begin
         Trm1[a_1,a_2,i_1,i_2] := 0.5* g_vvoo[a_1,a_2,i_1,i_2]
         R2u[a_1,a_2,i_1,i_2] += Trm1[a_1,a_2,i_1,i_2]
@@ -295,15 +295,15 @@ function calculate_ECCD()
 
 
 
-    Z::Float64 = 0.0
+    Z = 0.0
     g_oovv = deserialize("g_oovv.jlbin")
     T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor Z += 2*g_oovv[i_1, i_2, a_1, a_2]*T2_vvoo[a_1, a_2, i_1, i_2]
+    @tensor Z += 2 * g_oovv[ i_1, i_2, a_1, a_2 ] * T2_vvoo[ a_1, a_2, i_1, i_2 ]
     T2_vvoo = nothing
     g_oovv = nothing
     g_oovv = deserialize("g_oovv.jlbin")
     T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor Z += -1*g_oovv[i_1, i_2, a_1, a_2]*T2_vvoo[a_1, a_2, i_2, i_1]
+    @tensor Z += -1 * g_oovv[ i_1, i_2, a_1, a_2 ] * T2_vvoo[ a_1, a_2, i_2, i_1 ]
     T2_vvoo = nothing
     g_oovv = nothing
     return Z
@@ -314,12 +314,12 @@ function update_T2(T2,R2,Scaled_R2)
     f_vv = deserialize("f_vv.jlbin")
     f_oo = deserialize("f_oo.jlbin")
     nv = deserialize("nv.jlbin")
-    nocc = deserialize("nocc.jlbin")
+    no = deserialize("no.jlbin")
     shiftp = 0.20
-    for a in 1:nv, b in 1:nv, i in 1:nocc, j in 1:nocc
+    for a in 1:nv, b in 1:nv, i in 1:no, j in 1:no
         Scaled_R2[a,b,i,j] = R2[a,b,i,j]/(f_vv[a,a] + f_vv[b,b]-f_oo[i,i] - f_oo[j,j]+shiftp)
     end
-    for a in 1:nv, b in 1:nv, i in 1:nocc, j in 1:nocc
+    for a in 1:nv, b in 1:nv, i in 1:no, j in 1:no
         T2[a,b,i,j] = T2[a,b,i,j] - Scaled_R2[a,b,i,j]
     end
     return T2
@@ -336,11 +336,11 @@ end
 
 function calculate_R_iter(R_iter,R2)
     nv = deserialize("nv.jlbin")
-    nocc = deserialize("nocc.jlbin")
+    no = deserialize("no.jlbin")
     f_vv = deserialize("f_vv.jlbin")
     f_oo = deserialize("f_oo.jlbin")
     shiftp = 0.20
-    for a in 1:nv, b in 1:nv, i in 1:nocc, j in 1:nocc
+    for a in 1:nv, b in 1:nv, i in 1:no, j in 1:no
         R_iter[a,b,i,j] = R2[a,b,i,j]/(f_vv[a,a] + f_vv[b,b]-f_oo[i,i] - f_oo[j,j]+shiftp)
     end
     return R_iter
@@ -418,9 +418,9 @@ function calculate_residual_memeff(T2::Array{Float64,4})
     g_vvvv::Array{Float64,4} = deserialize("g_vvvv.jlbin")
     f_vv::Array{Float64,2} , f_oo::Array{Float64,2} = deserialize("f_vv.jlbin"),deserialize("f_oo.jlbin")
     nv::Int64 = deserialize("nv.jlbin")
-    nocc::Int64 = deserialize("nocc.jlbin")
-    R2u::Array{Float64,4} = zeros(Float64,nv,nv,nocc,nocc)
-    R2::Array{Float64,4} = zeros(Float64,nv,nv,nocc,nocc)
+    no::Int64 = deserialize("no.jlbin")
+    R2u::Array{Float64,4} = zeros(Float64,nv,nv,no,no)
+    R2::Array{Float64,4} = zeros(Float64,nv,nv,no,no)
     @tensor begin
         Trm1[a_1,a_2,i_1,i_2] := 0.5* g_vvoo[a_1,a_2,i_1,i_2]
         R2u[a_1,a_2,i_1,i_2] += Trm1[a_1,a_2,i_1,i_2]
@@ -496,14 +496,14 @@ end
 # The g_xxxx and the binary contraction intermediates are thrown away
 # after the subsequent terms are calculated
 
-function addres_gvvoo(R2u,nv,nocc)
+function addres_gvvoo(R2u,nv,no)
     g_vvoo = deserialize("g_vvoo.jlbin")
     @tensor Trm1[a_1,a_2,i_1,i_2] := 0.5* g_vvoo[a_1,a_2,i_1,i_2]
     @tensor R2u[a_1,a_2,i_1,i_2] += Trm1[a_1,a_2,i_1,i_2]
     return R2u
 end
 
-function addres_gvoov(R2u,nv,nocc,T2)
+function addres_gvoov(R2u,nv,no,T2)
     g_voov = deserialize("g_voov.jlbin")
     @tensor Trm2[a_1,a_2,i_1,i_2] := - g_voov[a_1,i_3,i_1,a_3] * T2[a_2,a_3,i_3,i_2]
     @tensor R2u[a_1,a_2,i_1,i_2] += Trm2[a_1,a_2,i_1,i_2]
@@ -512,7 +512,7 @@ function addres_gvoov(R2u,nv,nocc,T2)
     return R2u
 end
 
-function addres_gvovo(R2u,nv,nocc,T2)
+function addres_gvovo(R2u,nv,no,T2)
     g_vovo = deserialize("g_vovo.jlbin")
     @tensor Trm3[a_1,a_2,i_1,i_2] := - g_vovo[a_2,i_3,a_3,i_2] * T2[a_1,a_3,i_1,i_3]
     @tensor R2u[a_1,a_2,i_1,i_2] += Trm3[a_1,a_2,i_1,i_2]
@@ -521,35 +521,35 @@ function addres_gvovo(R2u,nv,nocc,T2)
     return R2u
 end
 
-function addres_goooo(R2u,nv,nocc,T2)
+function addres_goooo(R2u,nv,no,T2)
     g_oooo = deserialize("g_oooo.jlbin")
     @tensor Trm6[a_1,a_2,i_1,i_2] := 0.5*g_oooo[i_3,i_4,i_1,i_2] * T2[a_1,a_2,i_3,i_4]
     @tensor R2u[a_1,a_2,i_1,i_2] += Trm6[a_1,a_2,i_1,i_2]
     return R2u
 end
 
-function addres_gvvvv(R2u,nv,nocc,T2)
+function addres_gvvvv(R2u,nv,no,T2)
     g_vvvv = deserialize("g_vvvv.jlbin")
     @tensor Trm8[a_1,a_2,i_1,i_2] := + 0.5*g_vvvv[a_1,a_2,a_3,a_4] * T2[a_3,a_4,i_1,i_2]
     @tensor R2u[a_1,a_2,i_1,i_2] += Trm8[a_1,a_2,i_1,i_2]
     return R2u
 end
 
-function addres_f_vv(R2u,nv,nocc,T2)
+function addres_f_vv(R2u,nv,no,T2)
     f_vv = deserialize("f_vv.jlbin")
     @tensor Trm7[a_1,a_2,i_1,i_2] := f_vv[a_2,a_3] * T2[a_1,a_3,i_1,i_2]
     @tensor R2u[a_1,a_2,i_1,i_2] += Trm7[a_1,a_2,i_1,i_2]
     return R2u
 end
 
-function addres_f_oo(R2u,nv,nocc,T2)
+function addres_f_oo(R2u,nv,no,T2)
     f_oo = deserialize("f_oo.jlbin")
     @tensor Trm9[a_1,a_2,i_1,i_2] := - f_oo[i_3,i_2] * T2[a_1,a_2,i_1,i_3]
     @tensor R2u[a_1,a_2,i_1,i_2] += Trm9[a_1,a_2,i_1,i_2]
     return R2u
 end
 
-function addres_goovv(R2u,nv,nocc,T2)
+function addres_goovv(R2u,nv,no,T2)
     g_oovv = deserialize("g_oovv.jlbin")
     @tensor B1[i_4,a_4,a_1,i_1] := 2*(g_oovv[i_3,i_4,a_3,a_4] * T2[a_1,a_3,i_1,i_3])
     @tensor R2u[a_1,a_2,i_1,i_2] +=  B1[i_4,a_4,a_1,i_1] * T2[a_2,a_4,i_2,i_4]- B1[i_4,a_4,a_1,i_1] * T2[a_2,a_4,i_4,i_2]
@@ -571,63 +571,63 @@ function addres_goovv(R2u,nv,nocc,T2)
     @tensor R2u[a_1,a_2,i_1,i_2] += + B9[i_3,i_4,i_1,i_2] * T2[a_1,a_2,i_3,i_4]
 end
 
-function addres_goovvb1(R2u,nv,nocc,T2)
+function addres_goovvb1(R2u,nv,no,T2)
     g_oovv = deserialize("g_oovv.jlbin")
     @tensor B1[i_4,a_4,a_1,i_1] := 2*(g_oovv[i_3,i_4,a_3,a_4] * T2[a_1,a_3,i_1,i_3])
     @tensor R2u[a_1,a_2,i_1,i_2] +=  B1[i_4,a_4,a_1,i_1] * T2[a_2,a_4,i_2,i_4]- B1[i_4,a_4,a_1,i_1] * T2[a_2,a_4,i_4,i_2]
     return R2u
 end
 
-function addres_goovvb2(R2u,nv,nocc,T2)
+function addres_goovvb2(R2u,nv,no,T2)
     g_oovv = deserialize("g_oovv.jlbin")
     @tensor B2[i_4,a_4,a_1,i_1] := 0.5*(g_oovv[i_3,i_4,a_3,a_4] * T2[a_1,a_3,i_3,i_1])
     @tensor R2u[a_1,a_2,i_1,i_2] += B2[i_4,a_4,a_1,i_1] * T2[a_2,a_4,i_4,i_2]
     return R2u
 end
 
-function addres_goovvb3(R2u,nv,nocc,T2)
+function addres_goovvb3(R2u,nv,no,T2)
     g_oovv = deserialize("g_oovv.jlbin")
     @tensor B3[i_4,i_2] := 2*(g_oovv[i_3,i_4,a_3,a_4] * T2[a_3,a_4,i_3,i_2])
     @tensor R2u[a_1,a_2,i_1,i_2] +=  -B3[i_4,i_2] * T2[a_1,a_2,i_1,i_4]
     return R2u
 end
 
-function addres_goovvb4(R2u,nv,nocc,T2)
+function addres_goovvb4(R2u,nv,no,T2)
     g_oovv = deserialize("g_oovv.jlbin")
     @tensor B4[i_4,a_3,a_1,i_1] := (g_oovv[i_3,i_4,a_3,a_4] * T2[a_1,a_4,i_1,i_3])
     @tensor R2u[a_1,a_2,i_1,i_2] += -B4[i_4,a_3,a_1,i_1] * T2[a_2,a_3,i_2,i_4] + B4[i_4,a_3,a_1,i_1] * T2[a_2,a_3,i_4,i_2]
     return R2u
 end
 
-function addres_goovvb5(R2u,nv,nocc,T2)
+function addres_goovvb5(R2u,nv,no,T2)
     g_oovv = deserialize("g_oovv.jlbin")
     @tensor B5[a_3,a_2] := (g_oovv[i_3,i_4,a_3,a_4] * T2[a_2,a_4,i_4,i_3])
     @tensor R2u[a_1,a_2,i_1,i_2] += B5[a_3,a_2] * T2[a_1,a_3,i_1,i_2]
     return R2u
 end
 
-function addres_goovvb6(R2u,nv,nocc,T2)
+function addres_goovvb6(R2u,nv,no,T2)
     g_oovv = deserialize("g_oovv.jlbin")
     @tensor B6[i_4,i_2] := (g_oovv[i_3,i_4,a_3,a_4] * T2[a_3,a_4,i_2,i_3])
     @tensor R2u[a_1,a_2,i_1,i_2] += B6[i_4,i_2] * T2[a_1,a_2,i_1,i_4]
     return R2u
 end
 
-function addres_goovvb7(R2u,nv,nocc,T2)
+function addres_goovvb7(R2u,nv,no,T2)
     g_oovv = deserialize("g_oovv.jlbin")
     @tensor B7[a_4,a_2] := 2*(g_oovv[i_3,i_4,a_3,a_4] * T2[a_2,a_3,i_4,i_3])
     @tensor R2u[a_1,a_2,i_1,i_2] += - B7[a_4,a_2] * T2[a_1,a_4,i_1,i_2]
     return R2u
 end
 
-function addres_goovvb8(R2u,nv,nocc,T2)
+function addres_goovvb8(R2u,nv,no,T2)
     g_oovv = deserialize("g_oovv.jlbin")
     @tensor B8[i_4,a_3,a_1,i_2] := 0.5*(g_oovv[i_3,i_4,a_3,a_4] * T2[a_1,a_4,i_3,i_2])
     @tensor R2u[a_1,a_2,i_1,i_2] +=  +B8[i_4,a_3,a_1,i_2] * T2[a_2,a_3,i_4,i_1]
     return R2u
 end
 
-function addres_goovvb9(R2u,nv,nocc,T2)
+function addres_goovvb9(R2u,nv,no,T2)
     g_oovv = deserialize("g_oovv.jlbin")
     @tensor B9[i_3,i_4,i_1,i_2] := 0.5* (g_oovv[i_3,i_4,a_3,a_4] * T2[a_3,a_4,i_1,i_2])
     @tensor R2u[a_1,a_2,i_1,i_2] += + B9[i_3,i_4,i_1,i_2] * T2[a_1,a_2,i_3,i_4]
@@ -637,161 +637,160 @@ end
 
 function calcresnew()
     nv = deserialize("nv.jlbin")
-    nocc = deserialize("nocc.jlbin")
+    no = deserialize("no.jlbin")
 
-
-    I_vvoo = zeros(Float64, nv, nv, nocc, nocc)
+    I_vvoo = zeros(Float64, nv, nv, no, no)
     g_voov = deserialize("g_voov.jlbin")
     T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_vvoo[a_1, a_2, i_1, i_2] += -1*g_voov[a_1, i_3, i_1, a_3]*T2_vvoo[a_2, a_3, i_3, i_2]
+    @tensor I_vvoo[ a_1, a_2, i_1, i_2 ] += -1 * g_voov[ a_2, i_3, i_2, a_3 ] * T2_vvoo[ a_1, a_3, i_3, i_1 ]
     T2_vvoo = nothing
     g_voov = nothing
     g_vvoo = deserialize("g_vvoo.jlbin")
-    @tensor I_vvoo[a_1, a_2, i_1, i_2] += 1/2*g_vvoo[a_1, a_2, i_1, i_2]
+    @tensor I_vvoo[ a_1, a_2, i_1, i_2 ] += 1/2 * g_vvoo[ a_1, a_2, i_1, i_2 ]
     g_vvoo = nothing
     g_vovo = deserialize("g_vovo.jlbin")
     T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_vvoo[a_1, a_2, i_1, i_2] += -1*g_vovo[a_2, i_3, a_3, i_2]*T2_vvoo[a_1, a_3, i_1, i_3]
-    T2_vvoo = nothing
-    g_vovo = nothing
-    g_vovo = deserialize("g_vovo.jlbin")
-    T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_vvoo[a_1, a_2, i_1, i_2] += -1*g_vovo[a_2, i_3, a_3, i_1]*T2_vvoo[a_1, a_3, i_3, i_2]
+    @tensor I_vvoo[ a_1, a_2, i_1, i_2 ] += -1 * g_vovo[ a_2, i_3, a_3, i_1 ] * T2_vvoo[ a_1, a_3, i_3, i_2 ]
     T2_vvoo = nothing
     g_vovo = nothing
     g_voov = deserialize("g_voov.jlbin")
     T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_vvoo[a_1, a_2, i_1, i_2] += 2*g_voov[a_1, i_3, i_1, a_3]*T2_vvoo[a_2, a_3, i_2, i_3]
+    @tensor I_vvoo[ a_1, a_2, i_1, i_2 ] += 2 * g_voov[ a_2, i_3, i_2, a_3 ] * T2_vvoo[ a_1, a_3, i_1, i_3 ]
     T2_vvoo = nothing
     g_voov = nothing
+    g_vovo = deserialize("g_vovo.jlbin")
+    T2_vvoo = deserialize("T2_vvoo.jlbin")
+    @tensor I_vvoo[ a_1, a_2, i_1, i_2 ] += -1 * g_vovo[ a_1, i_3, a_3, i_1 ] * T2_vvoo[ a_2, a_3, i_2, i_3 ]
+    T2_vvoo = nothing
+    g_vovo = nothing
     g_oooo = deserialize("g_oooo.jlbin")
     T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_vvoo[a_1, a_2, i_1, i_2] += 1/2*g_oooo[i_3, i_4, i_1, i_2]*T2_vvoo[a_1, a_2, i_3, i_4]
+    @tensor I_vvoo[ a_1, a_2, i_1, i_2 ] += 1/2 * g_oooo[ i_3, i_4, i_1, i_2 ] * T2_vvoo[ a_1, a_2, i_3, i_4 ]
     T2_vvoo = nothing
     g_oooo = nothing
     f_vv = deserialize("f_vv.jlbin")
     T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_vvoo[a_1, a_2, i_1, i_2] += f_vv[a_2, a_3]*T2_vvoo[a_1, a_3, i_1, i_2]
+    @tensor I_vvoo[ a_1, a_2, i_1, i_2 ] += f_vv[ a_2, a_3 ] * T2_vvoo[ a_1, a_3, i_1, i_2 ]
     T2_vvoo = nothing
     f_vv = nothing
     g_vvvv = deserialize("g_vvvv.jlbin")
     T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_vvoo[a_1, a_2, i_1, i_2] += 1/2*g_vvvv[a_1, a_2, a_3, a_4]*T2_vvoo[a_3, a_4, i_1, i_2]
+    @tensor I_vvoo[ a_1, a_2, i_1, i_2 ] += 1/2 * g_vvvv[ a_1, a_2, a_3, a_4 ] * T2_vvoo[ a_3, a_4, i_1, i_2 ]
     T2_vvoo = nothing
     g_vvvv = nothing
     f_oo = deserialize("f_oo.jlbin")
     T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_vvoo[a_1, a_2, i_1, i_2] += -1*f_oo[i_3, i_2]*T2_vvoo[a_1, a_2, i_1, i_3]
+    @tensor I_vvoo[ a_1, a_2, i_1, i_2 ] += -1 * f_oo[ i_3, i_2 ] * T2_vvoo[ a_1, a_2, i_1, i_3 ]
     T2_vvoo = nothing
     f_oo = nothing
-    I_ovov = zeros(Float64, nocc, nv, nocc, nv)
-    g_oovv = deserialize("g_oovv.jlbin")
-    T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_ovov[i_4, a_1, i_1, a_4] += g_oovv[i_3, i_4, a_3, a_4]*T2_vvoo[a_1, a_3, i_1, i_3]
-    T2_vvoo = nothing
-    g_oovv = nothing
-    T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_vvoo[a_1, a_2, i_1, i_2] += 2*I_ovov[i_4, a_1, i_1, a_4]*T2_vvoo[a_2, a_4, i_2, i_4]
-    T2_vvoo = nothing
-    I_ovov = nothing
-    I_ovov = zeros(Float64, nocc, nv, nocc, nv)
-    g_oovv = deserialize("g_oovv.jlbin")
-    T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_ovov[i_4, a_1, i_1, a_4] += g_oovv[i_3, i_4, a_3, a_4]*T2_vvoo[a_1, a_3, i_1, i_3]
-    T2_vvoo = nothing
-    g_oovv = nothing
-    T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_vvoo[a_1, a_2, i_1, i_2] += -2*I_ovov[i_4, a_1, i_1, a_4]*T2_vvoo[a_2, a_4, i_4, i_2]
-    T2_vvoo = nothing
-    I_ovov = nothing
-    I_ovov = zeros(Float64, nocc, nv, nocc, nv)
-    g_oovv = deserialize("g_oovv.jlbin")
-    T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_ovov[i_4, a_1, i_1, a_4] += g_oovv[i_3, i_4, a_3, a_4]*T2_vvoo[a_1, a_3, i_3, i_1]
-    T2_vvoo = nothing
-    g_oovv = nothing
-    T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_vvoo[a_1, a_2, i_1, i_2] += 1/2*I_ovov[i_4, a_1, i_1, a_4]*T2_vvoo[a_2, a_4, i_4, i_2]
-    T2_vvoo = nothing
-    I_ovov = nothing
-    I_oo = zeros(Float64, nocc, nocc)
-    g_oovv = deserialize("g_oovv.jlbin")
-    T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_oo[i_4, i_2] += g_oovv[i_3, i_4, a_3, a_4]*T2_vvoo[a_3, a_4, i_3, i_2]
-    T2_vvoo = nothing
-    g_oovv = nothing
-    T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_vvoo[a_1, a_2, i_1, i_2] += -2*I_oo[i_4, i_2]*T2_vvoo[a_1, a_2, i_1, i_4]
-    T2_vvoo = nothing
-    I_oo = nothing
-    I_ovov = zeros(Float64, nocc, nv, nocc, nv)
-    g_oovv = deserialize("g_oovv.jlbin")
-    T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_ovov[i_4, a_1, i_1, a_3] += g_oovv[i_3, i_4, a_3, a_4]*T2_vvoo[a_1, a_4, i_1, i_3]
-    T2_vvoo = nothing
-    g_oovv = nothing
-    T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_vvoo[a_1, a_2, i_1, i_2] += -1*I_ovov[i_4, a_1, i_1, a_3]*T2_vvoo[a_2, a_3, i_2, i_4]
-    T2_vvoo = nothing
-    I_ovov = nothing
-    I_ovov = zeros(Float64, nocc, nv, nocc, nv)
-    g_oovv = deserialize("g_oovv.jlbin")
-    T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_ovov[i_4, a_1, i_1, a_3] += g_oovv[i_3, i_4, a_3, a_4]*T2_vvoo[a_1, a_4, i_1, i_3]
-    T2_vvoo = nothing
-    g_oovv = nothing
-    T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_vvoo[a_1, a_2, i_1, i_2] += I_ovov[i_4, a_1, i_1, a_3]*T2_vvoo[a_2, a_3, i_4, i_2]
-    T2_vvoo = nothing
-    I_ovov = nothing
     I_vv = zeros(Float64, nv, nv)
     g_oovv = deserialize("g_oovv.jlbin")
     T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_vv[a_2, a_3] += g_oovv[i_3, i_4, a_3, a_4]*T2_vvoo[a_2, a_4, i_4, i_3]
+    @tensor I_vv[ a_2, a_3 ] += g_oovv[ i_3, i_4, a_3, a_4 ] * T2_vvoo[ a_2, a_4, i_3, i_4 ]
     T2_vvoo = nothing
     g_oovv = nothing
     T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_vvoo[a_1, a_2, i_1, i_2] += I_vv[a_2, a_3]*T2_vvoo[a_1, a_3, i_1, i_2]
+    @tensor I_vvoo[ a_1, a_2, i_1, i_2 ] += -2 * I_vv[ a_2, a_3 ] * T2_vvoo[ a_1, a_3, i_1, i_2 ]
     T2_vvoo = nothing
     I_vv = nothing
-    I_oo = zeros(Float64, nocc, nocc)
+    I_vovo = zeros(Float64, nv, no, nv, no)
     g_oovv = deserialize("g_oovv.jlbin")
     T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_oo[i_4, i_2] += g_oovv[i_3, i_4, a_3, a_4]*T2_vvoo[a_3, a_4, i_2, i_3]
+    @tensor I_vovo[ a_1, i_4, a_4, i_1 ] += g_oovv[ i_3, i_4, a_3, a_4 ] * T2_vvoo[ a_1, a_3, i_1, i_3 ]
     T2_vvoo = nothing
     g_oovv = nothing
     T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_vvoo[a_1, a_2, i_1, i_2] += I_oo[i_4, i_2]*T2_vvoo[a_1, a_2, i_1, i_4]
+    @tensor I_vvoo[ a_1, a_2, i_1, i_2 ] += 2 * I_vovo[ a_1, i_4, a_4, i_1 ] * T2_vvoo[ a_2, a_4, i_2, i_4 ]
     T2_vvoo = nothing
-    I_oo = nothing
+    I_vovo = nothing
+    I_vovo = zeros(Float64, nv, no, nv, no)
+    g_oovv = deserialize("g_oovv.jlbin")
+    T2_vvoo = deserialize("T2_vvoo.jlbin")
+    @tensor I_vovo[ a_1, i_3, a_4, i_1 ] += g_oovv[ i_3, i_4, a_3, a_4 ] * T2_vvoo[ a_1, a_3, i_1, i_4 ]
+    T2_vvoo = nothing
+    g_oovv = nothing
+    T2_vvoo = deserialize("T2_vvoo.jlbin")
+    @tensor I_vvoo[ a_1, a_2, i_1, i_2 ] += I_vovo[ a_1, i_3, a_4, i_1 ] * T2_vvoo[ a_2, a_4, i_3, i_2 ]
+    T2_vvoo = nothing
+    I_vovo = nothing
     I_vv = zeros(Float64, nv, nv)
     g_oovv = deserialize("g_oovv.jlbin")
     T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_vv[a_2, a_4] += g_oovv[i_3, i_4, a_3, a_4]*T2_vvoo[a_2, a_3, i_4, i_3]
+    @tensor I_vv[ a_2, a_4 ] += g_oovv[ i_3, i_4, a_3, a_4 ] * T2_vvoo[ a_2, a_3, i_3, i_4 ]
     T2_vvoo = nothing
     g_oovv = nothing
     T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_vvoo[a_1, a_2, i_1, i_2] += -2*I_vv[a_2, a_4]*T2_vvoo[a_1, a_4, i_1, i_2]
+    @tensor I_vvoo[ a_1, a_2, i_1, i_2 ] += I_vv[ a_2, a_4 ] * T2_vvoo[ a_1, a_4, i_1, i_2 ]
     T2_vvoo = nothing
     I_vv = nothing
-    I_ovov = zeros(Float64, nocc, nv, nocc, nv)
+    I_oo = zeros(Float64, no, no)
     g_oovv = deserialize("g_oovv.jlbin")
     T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_ovov[i_4, a_1, i_2, a_3] += g_oovv[i_3, i_4, a_3, a_4]*T2_vvoo[a_1, a_4, i_3, i_2]
+    @tensor I_oo[ i_3, i_2 ] += g_oovv[ i_3, i_4, a_3, a_4 ] * T2_vvoo[ a_3, a_4, i_4, i_2 ]
     T2_vvoo = nothing
     g_oovv = nothing
     T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_vvoo[a_1, a_2, i_1, i_2] += 1/2*I_ovov[i_4, a_1, i_2, a_3]*T2_vvoo[a_2, a_3, i_4, i_1]
+    @tensor I_vvoo[ a_1, a_2, i_1, i_2 ] += I_oo[ i_3, i_2 ] * T2_vvoo[ a_1, a_2, i_1, i_3 ]
     T2_vvoo = nothing
-    I_ovov = nothing
-    I_oooo = zeros(Float64, nocc, nocc, nocc, nocc)
+    I_oo = nothing
+    I_vovo = zeros(Float64, nv, no, nv, no)
     g_oovv = deserialize("g_oovv.jlbin")
     T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_oooo[i_3, i_4, i_1, i_2] += g_oovv[i_3, i_4, a_3, a_4]*T2_vvoo[a_3, a_4, i_1, i_2]
+    @tensor I_vovo[ a_1, i_4, a_4, i_1 ] += g_oovv[ i_3, i_4, a_3, a_4 ] * T2_vvoo[ a_1, a_3, i_3, i_1 ]
     T2_vvoo = nothing
     g_oovv = nothing
     T2_vvoo = deserialize("T2_vvoo.jlbin")
-    @tensor I_vvoo[a_1, a_2, i_1, i_2] += 1/2*I_oooo[i_3, i_4, i_1, i_2]*T2_vvoo[a_1, a_2, i_3, i_4]
+    @tensor I_vvoo[ a_1, a_2, i_1, i_2 ] += 1/2 * I_vovo[ a_1, i_4, a_4, i_1 ] * T2_vvoo[ a_2, a_4, i_4, i_2 ]
+    T2_vvoo = nothing
+    I_vovo = nothing
+    I_vovo = zeros(Float64, nv, no, nv, no)
+    g_oovv = deserialize("g_oovv.jlbin")
+    T2_vvoo = deserialize("T2_vvoo.jlbin")
+    @tensor I_vovo[ a_1, i_3, a_3, i_1 ] += g_oovv[ i_3, i_4, a_3, a_4 ] * T2_vvoo[ a_1, a_4, i_1, i_4 ]
+    T2_vvoo = nothing
+    g_oovv = nothing
+    T2_vvoo = deserialize("T2_vvoo.jlbin")
+    @tensor I_vvoo[ a_1, a_2, i_1, i_2 ] += -2 * I_vovo[ a_1, i_3, a_3, i_1 ] * T2_vvoo[ a_2, a_3, i_3, i_2 ]
+    T2_vvoo = nothing
+    I_vovo = nothing
+    I_vovo = zeros(Float64, nv, no, nv, no)
+    g_oovv = deserialize("g_oovv.jlbin")
+    T2_vvoo = deserialize("T2_vvoo.jlbin")
+    @tensor I_vovo[ a_1, i_4, a_3, i_1 ] += g_oovv[ i_3, i_4, a_3, a_4 ] * T2_vvoo[ a_1, a_4, i_1, i_3 ]
+    T2_vvoo = nothing
+    g_oovv = nothing
+    T2_vvoo = deserialize("T2_vvoo.jlbin")
+    @tensor I_vvoo[ a_1, a_2, i_1, i_2 ] += -1 * I_vovo[ a_1, i_4, a_3, i_1 ] * T2_vvoo[ a_2, a_3, i_2, i_4 ]
+    T2_vvoo = nothing
+    I_vovo = nothing
+    I_oo = zeros(Float64, no, no)
+    g_oovv = deserialize("g_oovv.jlbin")
+    T2_vvoo = deserialize("T2_vvoo.jlbin")
+    @tensor I_oo[ i_3, i_2 ] += g_oovv[ i_3, i_4, a_3, a_4 ] * T2_vvoo[ a_3, a_4, i_2, i_4 ]
+    T2_vvoo = nothing
+    g_oovv = nothing
+    T2_vvoo = deserialize("T2_vvoo.jlbin")
+    @tensor I_vvoo[ a_1, a_2, i_1, i_2 ] += -2 * I_oo[ i_3, i_2 ] * T2_vvoo[ a_1, a_2, i_1, i_3 ]
+    T2_vvoo = nothing
+    I_oo = nothing
+    I_vovo = zeros(Float64, nv, no, nv, no)
+    g_oovv = deserialize("g_oovv.jlbin")
+    T2_vvoo = deserialize("T2_vvoo.jlbin")
+    @tensor I_vovo[ a_1, i_4, a_3, i_2 ] += g_oovv[ i_3, i_4, a_3, a_4 ] * T2_vvoo[ a_1, a_4, i_3, i_2 ]
+    T2_vvoo = nothing
+    g_oovv = nothing
+    T2_vvoo = deserialize("T2_vvoo.jlbin")
+    @tensor I_vvoo[ a_1, a_2, i_1, i_2 ] += 1/2 * I_vovo[ a_1, i_4, a_3, i_2 ] * T2_vvoo[ a_2, a_3, i_4, i_1 ]
+    T2_vvoo = nothing
+    I_vovo = nothing
+    I_oooo = zeros(Float64, no, no, no, no)
+    g_oovv = deserialize("g_oovv.jlbin")
+    T2_vvoo = deserialize("T2_vvoo.jlbin")
+    @tensor I_oooo[ i_3, i_4, i_1, i_2 ] += g_oovv[ i_3, i_4, a_3, a_4 ] * T2_vvoo[ a_3, a_4, i_1, i_2 ]
+    T2_vvoo = nothing
+    g_oovv = nothing
+    T2_vvoo = deserialize("T2_vvoo.jlbin")
+    @tensor I_vvoo[ a_1, a_2, i_1, i_2 ] += 1/2 * I_oooo[ i_3, i_4, i_1, i_2 ] * T2_vvoo[ a_1, a_2, i_3, i_4 ]
     T2_vvoo = nothing
     I_oooo = nothing
     @tensor R2[a,b,i,j] := I_vvoo[a,b,i,j] + I_vvoo[b,a,j,i]
@@ -801,26 +800,26 @@ end
 # function calcresnew() #Handwritten version. Better memory management.
 #     T2 = deserialize("T2_vvoo.jlbin")
 #     nv = deserialize("nv.jlbin")
-#     nocc = deserialize("nocc.jlbin")
-#     R2u = zeros(Float64,nv,nv,nocc,nocc)
-#     R2 =  zeros(Float64,nv,nv,nocc,nocc)
-#     R2u = addres_gvvoo(R2u,nv,nocc)
-#     R2u = addres_gvoov(R2u,nv,nocc,T2)
-#     R2u = addres_gvovo(R2u,nv,nocc,T2)
-#     R2u = addres_goooo(R2u,nv,nocc,T2)
-#     R2u = addres_gvvvv(R2u,nv,nocc,T2)
-#     R2u = addres_fvv(R2u,nv,nocc,T2)
-#     R2u = addres_foo(R2u,nv,nocc,T2)
-#     # R2u = addres_goovv(R2u,nv,nocc,T2)  #In this all the BX terms are still in memory at once
-#     R2u = addres_goovvb1(R2u,nv,nocc,T2)
-#     R2u = addres_goovvb2(R2u,nv,nocc,T2)
-#     R2u = addres_goovvb3(R2u,nv,nocc,T2)
-#     R2u = addres_goovvb4(R2u,nv,nocc,T2)
-#     R2u = addres_goovvb5(R2u,nv,nocc,T2)
-#     R2u = addres_goovvb6(R2u,nv,nocc,T2)
-#     R2u = addres_goovvb7(R2u,nv,nocc,T2)
-#     R2u = addres_goovvb8(R2u,nv,nocc,T2)
-#     R2u = addres_goovvb9(R2u,nv,nocc,T2)
+#     no = deserialize("no.jlbin")
+#     R2u = zeros(Float64,nv,nv,no,no)
+#     R2 =  zeros(Float64,nv,nv,no,no)
+#     R2u = addres_gvvoo(R2u,nv,no)
+#     R2u = addres_gvoov(R2u,nv,no,T2)
+#     R2u = addres_gvovo(R2u,nv,no,T2)
+#     R2u = addres_goooo(R2u,nv,no,T2)
+#     R2u = addres_gvvvv(R2u,nv,no,T2)
+#     R2u = addres_fvv(R2u,nv,no,T2)
+#     R2u = addres_foo(R2u,nv,no,T2)
+#     # R2u = addres_goovv(R2u,nv,no,T2)  #In this all the BX terms are still in memory at once
+#     R2u = addres_goovvb1(R2u,nv,no,T2)
+#     R2u = addres_goovvb2(R2u,nv,no,T2)
+#     R2u = addres_goovvb3(R2u,nv,no,T2)
+#     R2u = addres_goovvb4(R2u,nv,no,T2)
+#     R2u = addres_goovvb5(R2u,nv,no,T2)
+#     R2u = addres_goovvb6(R2u,nv,no,T2)
+#     R2u = addres_goovvb7(R2u,nv,no,T2)
+#     R2u = addres_goovvb8(R2u,nv,no,T2)
+#     R2u = addres_goovvb9(R2u,nv,no,T2)
 #     @tensor R2[a,b,i,j] += R2u[a,b,i,j] + R2u[b,a,j,i]
 #     return R2
 # end

@@ -1,9 +1,15 @@
 #include "format_support.hpp"
 #include "processing.hpp"
 #include "utils.hpp"
-
+#include <CLI/CLI.hpp>
 #include <SeQuant/core/context.hpp>
+#include <SeQuant/core/eval_node.hpp>
+#include <SeQuant/core/export/export.hpp>
 #include <SeQuant/core/export/itf.hpp>
+#include <SeQuant/core/export/julia_itensorgen.hpp>
+#include <SeQuant/core/export/julia_tensorkitgen.hpp>
+#include <SeQuant/core/export/julia_tensoroperationsgen.hpp>
+#include <SeQuant/core/export/text_generator.hpp>
 #include <SeQuant/core/expr.hpp>
 #include <SeQuant/core/parse.hpp>
 #include <SeQuant/core/runtime.hpp>
@@ -13,8 +19,6 @@
 #include <SeQuant/domain/mbpt/convention.hpp>
 #include <SeQuant/domain/mbpt/op.hpp>
 #include <SeQuant/domain/mbpt/spin.hpp> // for remove_tensor
-
-#include <CLI/CLI.hpp>
 
 #include <nlohmann/json.hpp>
 
@@ -177,13 +181,104 @@ void generateITF(const json &blocks, std::string_view out_file, const IndexSpace
 	output << itfCode;
 }
 
+template< typename Generator >
+void generateJulia(const json &blocks, std::string_view out_file, const IndexSpaceMeta &spaceMeta) {
+	using Context = typename Generator::Context;
+
+	std::string julia_code;
+	std::map< IndexSpace, std::string > index_tags;
+	std::map< IndexSpace, std::string > index_dims;
+	std::map< sequant::IndexSpace, IndexSpaceMeta::Entry > index_data = spaceMeta.get_data();
+	for (const auto &[space, entry] : index_data) {
+		std::string tag   = toUtf8(entry.tag);
+		index_tags[space] = tag;
+		// default dims will be used if not specified
+	}
+	bool print_intermediate_comments = false;
+
+	for (const json &current_block : blocks) {
+		const std::string block_name = current_block.at("name");
+
+		spdlog::debug("Processing JuliaTensorOperations code block '{}'", block_name);
+
+		// std::vector< itf::Result > results;
+
+		for (const json &current_result : current_block.at("results")) {
+			const std::string result_name = current_result.at("name");
+			const std::string input_file  = current_result.at("equation_file");
+
+			spdlog::debug("Processing equations from '{}' to result '{}'", input_file, result_name);
+
+			if (!std::filesystem::exists(input_file)) {
+				throw std::runtime_error("Specified input file '" + input_file + "' does not exist");
+			}
+
+			// Read input file
+			std::ifstream in(input_file);
+			const std::string input(std::istreambuf_iterator< char >(in), {});
+
+			sequant::ExprPtr expression = sequant::parse_expr(toUtf16(input), Symmetry::antisymm);
+
+			spdlog::debug("Initial equation is:\n{}", expression);
+
+			ProcessingOptions options = extractProcessingOptions(current_result);
+
+			expression = postProcess(expression, spaceMeta, options);
+
+			std::wstring resultName = toUtf16(current_result.at("name").get< std::string >());
+
+			if (needsSymmetrization(expression)) {
+				std::optional< ExprPtr > symmetrizer = popTensor(expression, L"S");
+				assert(symmetrizer.has_value());
+
+				spdlog::debug("After popping S tensor:\n{}", expression);
+
+
+				IndexGroups externals = get_unique_indices(symmetrizer.value());
+				// results.push_back(toItfResult(resultName + L"u", expression, context, false));
+
+				ExprPtr symmetrization = generateResultSymmetrization(resultName + L"u", externals);
+
+				spdlog::debug("Result symmetrization via\n{}", symmetrization);
+				Context ctx(index_tags, index_dims, print_intermediate_comments);
+				Generator generator;
+				auto tree = eval_node< EvalExpr >(expression);
+				export_expression(tree, generator, ctx);
+				julia_code = generator.get_generated_code();
+				std::cout << "--" << result_name << "--\n" << julia_code;
+
+				Context ctx2(index_tags, index_dims, print_intermediate_comments);
+				Generator generator2;
+				auto tree2 = eval_node< EvalExpr >(symmetrization);
+				export_expression(tree2, generator2, ctx2);
+				julia_code = generator2.get_generated_code();
+				std::cout << "--" << "Symmetrization via" << "--\n" << julia_code;
+			} else {
+				Context ctx(index_tags, index_dims, print_intermediate_comments);
+				Generator generator;
+				auto tree = eval_node< EvalExpr >(expression);
+				export_expression(tree, generator, ctx);
+				julia_code = generator.get_generated_code();
+				std::cout << "--" << result_name << "--\n" << julia_code;
+			}
+		}
+	}
+}
+
 void generateCode(const json &details, const IndexSpaceMeta &spaceMeta) {
 	const std::string format   = details.at("output_format");
 	const std::string out_path = details.at("output_path");
-
 	if (boost::iequals(format, "itf")) {
 		generateITF(details.at("code_blocks"), out_path, spaceMeta);
-	} else {
+	} else if (boost::iequals(format, "juliatensoroperations")) {
+		generateJulia< JuliaTensorOperationsGen< JuliaTensorOperationsGenContext > >(details.at("code_blocks"),
+																					 out_path, spaceMeta);
+	} else if (boost::iequals(format, "juliatensorkit")) {
+		generateJulia< JuliaTensorKitGen< JuliaTensorKitGenContext > >(details.at("code_blocks"), out_path, spaceMeta);
+	} else if (boost::iequals(format, "juliaitensor")) {
+		generateJulia< JuliaITensorGen< JuliaITensorGenContext > >(details.at("code_blocks"), out_path, spaceMeta);
+	} 
+	else {
 		throw std::runtime_error("Unknown code generation target format '" + std::string(format) + "'");
 	}
 }
@@ -191,7 +286,7 @@ void generateCode(const json &details, const IndexSpaceMeta &spaceMeta) {
 void registerIndexSpaces(const json &spaces, IndexSpaceMeta &meta) {
 	IndexSpaceRegistry &registry = *get_default_context().mutable_index_space_registry();
 
-	std::vector< std::pair<std::wstring, IndexSpaceMeta::Entry> > spaceList;
+	std::vector< std::pair< std::wstring, IndexSpaceMeta::Entry > > spaceList;
 	spaceList.reserve(spaces.size());
 
 	for (std::size_t i = 0; i < spaces.size(); ++i) {
@@ -213,7 +308,7 @@ void registerIndexSpaces(const json &spaces, IndexSpaceMeta &meta) {
 		spdlog::debug("Registered index space '{}' with label '{}', tag '{}' and size {}", toUtf8(entry.name),
 					  toUtf8(label), toUtf8(entry.tag), size);
 
-		spaceList.push_back(std::make_pair(std::move(label), std::move(entry) ));
+		spaceList.push_back(std::make_pair(std::move(label), std::move(entry)));
 	}
 
 	mbpt::add_fermi_spin(registry);

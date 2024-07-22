@@ -50,6 +50,10 @@ void IndexSpaceMeta::registerSpace(IndexSpace space, Entry entry) {
 	m_entries.insert({ std::move(space), std::move(entry) });
 }
 
+std::map<sequant::IndexSpace, IndexSpaceMeta::Entry> IndexSpaceMeta::get_data() const {
+    return m_entries;
+}
+
 container::svector< container::svector< Index > > getExternalIndexPairs(const Tensor &tensor) {
 	container::svector< container::svector< Index > > externalPairs;
 

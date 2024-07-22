@@ -85,6 +85,18 @@ class JuliaTensorOperationsGen : public Generator<Context> {
     }
     return sstream.str();
   }
+  std::string get_indices_string(const Tensor &tensor, const Context &ctx) {
+    const auto &indices = tensor.const_braket();
+    std::string representation;
+    for (std::size_t i = 0; i < indices.size(); ++i) {
+      representation += represent(indices[i], ctx);
+
+      if (i + 1 < indices.size()) {
+        representation += ", ";
+      }
+    }
+    return representation;
+  }
 
   void create(const Tensor &tensor, bool zero_init,
               const Context &ctx) override {
@@ -290,6 +302,7 @@ class JuliaTensorOperationsGen : public Generator<Context> {
   }
 
   std::string m_generated;
+
 };
 
 }  // namespace sequant

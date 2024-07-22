@@ -107,7 +107,7 @@ class JuliaTensorKitGen : public JuliaTensorOperationsGen<Context> {
           rhs2 += "ℝ^" + dimStrings[i] + " ⊗ ";
         }
       }
-      this->m_generated += " = " + rhs2 + "\n";
+      this->m_generated += " = " + rhs2;
     }
 
     this->m_generated += "\n";

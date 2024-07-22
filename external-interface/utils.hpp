@@ -32,6 +32,7 @@ public:
 
 	void registerSpace(sequant::IndexSpace space, Entry entry);
 
+	std::map< sequant::IndexSpace, Entry > get_data() const;	
 private:
 	std::map< sequant::IndexSpace, Entry > m_entries;
 };

@@ -8,10 +8,10 @@ include("ccd-helper.jl")
 function ccd_by_hand(maxitr)
     initialize_cc_variables()
     nv = deserialize("nv.jlbin") ::Int64
-    nocc = deserialize("nocc.jlbin") ::Int64
+    no = deserialize("no.jlbin") ::Int64
     erhf = deserialize("erhf.jlbin")    ::Float64
-    R2 = TensorMap(zeros(Float64,nv,nv,nocc,nocc),ℝ^nv ⊗ ℝ^nv , ℝ^nocc ⊗ ℝ^nocc)
-    # R2u = TensorMap(zeros(Float64,nv,nv,nocc,nocc),ℝ^nv ⊗ ℝ^nv , ℝ^nocc ⊗ ℝ^nocc)
+    R2 = TensorMap(zeros(Float64,nv,nv,no,no),ℝ^nv ⊗ ℝ^nv , ℝ^no ⊗ ℝ^no)
+    # R2u = TensorMap(zeros(Float64,nv,nv,no,no),ℝ^nv ⊗ ℝ^nv , ℝ^no ⊗ ℝ^no)
     R_iter = copy(R2) 
     Scaled_R2 = copy(R2)
     T2_old= initialize_t2_only()
@@ -82,4 +82,3 @@ function ccd_by_hand(maxitr)
 end
 maxitr = 100;
 @time ccd_by_hand(maxitr);
-# @code_warntype ccd_by_hand(maxitr)
