@@ -1,5 +1,25 @@
 using DelimitedFiles, TensorOperations, LinearAlgebra, MKL, TensorKit, Serialization
 
+function TDot(R2_i,R2_j)
+    nv = size(R2_i)[1]
+    no = size(R2_i)[end]
+    flatdims = nv*no
+    Ri = zeros(flatdims,flatdims)
+    Rj = zeros(flatdims,flatdims)
+    for a in 1:nv , b in 1:nv , i in 1:no , j in 1:no
+        Ri[a+nv*(i-1),b+nv*(j-1)] = R2_i[a,b,i,j]
+        Rj[a+nv*(i-1),b+nv*(j-1)] = R2_j[a,b,i,j]
+    end
+    dot = 0.0
+    flag = 0
+    for X in 1:flatdims
+        for Y in 1:X
+            dot += Ri[X,Y]*Rj[X,Y]
+            flag +=1
+        end
+    end
+    return dot
+end
 
 function main(pathtofcidump)
     linenum = 0
@@ -289,6 +309,8 @@ function update_amplitudes(T2, R2, Scaled_R2,T1,R1,Scaled_R1)
 
     return T2,T1
 end
+
+
 function check_convergence(R1,R2, normtol, e_old, e_new, etol)
     rnorm = norm(R1) + norm(R2)
     if (rnorm < normtol && abs(e_new[1] - e_old[1]) < etol)
@@ -298,6 +320,7 @@ function check_convergence(R1,R2, normtol, e_old, e_new, etol)
     end
 
 end
+
 
 function calculate_R_iter(R_iter, R2)
     nv = deserialize("nv.jlbin")
@@ -346,31 +369,37 @@ function just_show_Bmatrix(R_iter_storage, p, T2_storage, R2_storage)
     # display(C)
 end
 
-function PerformDiis(R_iter_storage, p, T2_storage, R2_storage)
+function PerformDiis(p, T2_storage, R2_storage,T1_storage,R1_storage,dummycall)
+    #Define B Matrix
+    # We are trying to minimize dot(R1) + dot(R2) so our B-Matrix is populated accordingly
     B = zeros(p + 1, p + 1)
-    Bpp = dot(R2_storage[p], R2_storage[p])
     for i in 1:p
         for j in 1:i
-            # B[i,j] = dot(R_iter_storage[i],R_iter_storage[j])/Bpp
-            B[i, j] = dot(R2_storage[i], R2_storage[j])
+            B[i, j] = dot(R1_storage[i], R1_storage[j]) + dot(R2_storage[i], R2_storage[j])
             B[j, i] = B[i, j]
         end
     end
-    # display(@views B[1:p,1:p])
     B[p+1, 1:p] .= -1
     B[1:p, p+1] .= -1
     B[p+1, p+1] = 0
     Id = zeros(p + 1)
     Id[p+1] = -1
+
+
+    #Solve for DIIS Coefficients
     C = B \ Id
-    pop!(C) # As C[p+1] is the Lagrange multiplier
-    t = zeros(size(R_iter_storage[1]))
+    pop!(C)
+
+    #Construct DIIS Corrected Amplitudes
+    t2 = zeros(size(R2_storage[1]))
+    t1 = zeros(size(R1_storage[1]))
     for i in 1:p
-        t = t + C[i] .* T2_storage[i]
+        t2 = t2 + C[i] .* T2_storage[i]
     end
-    # display(B)
-    # display(C)
-    return (t)
+    for i in 1:p
+        t1 = t1 + C[i] .* T1_storage[i]
+    end
+    return t2,t1
 end
 function calc_R2()
     nv = deserialize("nv.jlbin")
