@@ -6,8 +6,7 @@ function CCSD_by_hand(maxitr)
     no = deserialize("no.jlbin") ::Int64
     erhf = deserialize("erhf.jlbin")    ::Float64
     R1 = TensorMap(zeros(Float64,nv,no),ℝ^nv, ℝ^no)
-    R2 = TensorMap(zeros(Float64,nv,nv,no,no),ℝ^nv ⊗ ℝ^nv , ℝ^no ⊗ ℝ^no)
-    R_iter = copy(R2) 
+    R2 = TensorMap(zeros(Float64,nv,nv,no,no),ℝ^nv ⊗ ℝ^nv , ℝ^no ⊗ ℝ^no) 
     Scaled_R2 = copy(R2)
     Scaled_R1 = copy(R1)
     T2= initialize_t2_only()
@@ -21,7 +20,6 @@ function CCSD_by_hand(maxitr)
     etol ::Float64 = 1.0e-10
     p_max ::Int64 =  6# Maximum number of previous iterations to store for DIIS
     p_min ::Int64 = 2 # DIIS will start after this many iterations
-    R_iter_storage = Array{typeof(R2)}(undef, 0)
     T2_storage = Array{typeof(T2)}(undef, 0)
     R2_storage = Array{typeof(R2)}(undef, 0)
     T1_storage = Array{typeof(T1)}(undef, 0)
@@ -52,10 +50,8 @@ function CCSD_by_hand(maxitr)
             @printf("CCSD Converged in %d iterations, no further updates required,current ||R||=%.10f and ΔE = %.12f\n\n-------------------------\nE_Total = %.8f\n", i,rnorm,abs(e_old[1]-e_new[1]),e_new[1]+erhf)
             break
         end
-
-        #DIIS
-        R_iter = calculate_R_iter(R_iter,R2)
         @printf("CCSD Not Converged in %d iterations, current ||R|| = %.10f and ΔE = %.12f \n", i,rnorm,abs(e_old[1]-e_new[1]))
+        #DIIS
         if i >= p_min   #DIIS  starts
             println("DIIS is being implemented in iteration $i")
             # if i >= p_min + p_max - 1
